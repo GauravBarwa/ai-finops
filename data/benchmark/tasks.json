@@ -1,0 +1,56 @@
+[
+  {
+    "task_id": "sum_001",
+    "task_type": "summarization",
+    "prompt": "Summarize the following text in 2-3 sentences:\n\nArtificial intelligence (AI) has transformed numerous industries, from healthcare diagnostics to financial fraud detection. Machine learning algorithms can now process vast amounts of data to identify patterns that would take humans months to discover. However, the rapid adoption of AI also raises important questions about bias, transparency, and accountability. Organizations must carefully consider these ethical dimensions alongside the technical capabilities when deploying AI systems. The balance between innovation and responsible deployment remains one of the most critical challenges facing the technology sector today.",
+    "reference": "AI has revolutionized industries like healthcare and finance through pattern recognition in large datasets. However, its rapid adoption raises ethical concerns about bias, transparency, and accountability. Balancing innovation with responsible deployment is a key challenge for the tech sector."
+  },
+  {
+    "task_id": "sum_002",
+    "task_type": "summarization",
+    "prompt": "Summarize the following text in 2-3 sentences:\n\nCloud computing has fundamentally changed how businesses manage their IT infrastructure. Rather than maintaining expensive on-premises servers, companies can now rent computing resources on demand from providers like AWS, Google Cloud, and Microsoft Azure. This shift has enabled startups to launch products without massive upfront capital investment. The pay-as-you-go model allows organizations to scale resources up or down based on actual usage, resulting in significant cost savings. However, concerns about vendor lock-in, data sovereignty, and security continue to influence enterprise cloud adoption strategies.",
+    "reference": "Cloud computing has transformed IT infrastructure by enabling on-demand resource rental instead of expensive on-premises servers. The pay-as-you-go model benefits startups and enables cost-effective scaling. Despite these advantages, concerns about vendor lock-in, data sovereignty, and security remain important factors in adoption decisions."
+  },
+  {
+    "task_id": "sum_003",
+    "task_type": "summarization",
+    "prompt": "Summarize the following text in 2-3 sentences:\n\nQuantum computing represents a paradigm shift in computational power. Unlike classical computers that process information in binary bits (0 or 1), quantum computers use qubits that can exist in multiple states simultaneously through superposition. This enables quantum machines to solve certain types of problems exponentially faster than classical computers. Current applications include drug discovery, cryptography, and optimization problems. Despite significant progress by companies like IBM and Google, practical large-scale quantum computing still faces challenges including qubit stability and error correction.",
+    "reference": "Quantum computing uses qubits and superposition to solve certain problems exponentially faster than classical binary computers. It has promising applications in drug discovery, cryptography, and optimization. However, practical large-scale quantum computing still faces significant challenges in qubit stability and error correction."
+  },
+  {
+    "task_id": "cls_001",
+    "task_type": "classification",
+    "prompt": "Classify the sentiment of the following customer review as POSITIVE, NEGATIVE, or NEUTRAL. Respond with only the classification label.\n\nReview: \"I absolutely love this product! It arrived on time, the packaging was beautiful, and the quality exceeded my expectations. I've already recommended it to all my friends. Best purchase I've made this year!\"",
+    "reference": "POSITIVE"
+  },
+  {
+    "task_id": "cls_002",
+    "task_type": "classification",
+    "prompt": "Classify the sentiment of the following customer review as POSITIVE, NEGATIVE, or NEUTRAL. Respond with only the classification label.\n\nReview: \"The product is okay. It does what it says but nothing special. Delivery was on time. I might buy it again if there's no better alternative, but I wouldn't go out of my way to recommend it.\"",
+    "reference": "NEUTRAL"
+  },
+  {
+    "task_id": "cls_003",
+    "task_type": "classification",
+    "prompt": "Classify the sentiment of the following customer review as POSITIVE, NEGATIVE, or NEUTRAL. Respond with only the classification label.\n\nReview: \"Terrible experience. The item arrived damaged and customer support was unhelpful. I waited three weeks for a replacement that never came. Finally got a refund but wasted so much time. Would never buy from this company again.\"",
+    "reference": "NEGATIVE"
+  },
+  {
+    "task_id": "ext_001",
+    "task_type": "extraction",
+    "prompt": "Extract the following information from the text below and return it as JSON with keys: company_name, revenue, year, growth_rate.\n\nText: \"TechVision Corp reported annual revenue of $4.2 billion for fiscal year 2025, representing a 15.3% increase compared to the previous year. The company attributed its strong performance to growth in its cloud services division.\"",
+    "reference": "{\"company_name\": \"TechVision Corp\", \"revenue\": \"$4.2 billion\", \"year\": \"2025\", \"growth_rate\": \"15.3%\"}"
+  },
+  {
+    "task_id": "ext_002",
+    "task_type": "extraction",
+    "prompt": "Extract the following information from the text below and return it as JSON with keys: person_name, job_title, company, location.\n\nText: \"Sarah Chen has been appointed as the new Chief Technology Officer at DataFlow Systems, a leading analytics firm headquartered in San Francisco. She previously served as VP of Engineering at CloudScale Technologies.\"",
+    "reference": "{\"person_name\": \"Sarah Chen\", \"job_title\": \"Chief Technology Officer\", \"company\": \"DataFlow Systems\", \"location\": \"San Francisco\"}"
+  },
+  {
+    "task_id": "ext_003",
+    "task_type": "extraction",
+    "prompt": "Extract the following information from the text below and return it as JSON with keys: event_name, date, location, organizer, expected_attendees.\n\nText: \"The Global AI Summit 2026, organized by the International Technology Foundation, will be held on March 15-17, 2026 in Singapore. The event is expected to attract over 5,000 attendees from 40 countries, featuring keynotes from leading AI researchers and industry leaders.\"",
+    "reference": "{\"event_name\": \"Global AI Summit 2026\", \"date\": \"March 15-17, 2026\", \"location\": \"Singapore\", \"organizer\": \"International Technology Foundation\", \"expected_attendees\": \"5,000\"}"
+  }
+]
