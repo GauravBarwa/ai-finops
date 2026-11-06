@@ -40,8 +40,8 @@ def create_app() -> FastAPI:
         title="AI FinOps",
         description=(
             "Intelligent LLM Model Selection & Cost Optimization — "
-            "compare multiple models on the same workload and capture "
-            "quality, cost, latency, and reliability metrics."
+            "profile benchmark workloads, compare model executions, and route prompts "
+            "using measured evidence and quality, cost, latency, and reliability requirements."
         ),
         version="0.1.0",
         lifespan=lifespan,

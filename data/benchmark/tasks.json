@@ -52,5 +52,47 @@
     "task_type": "extraction",
     "prompt": "Extract the following information from the text below and return it as JSON with keys: event_name, date, location, organizer, expected_attendees.\n\nText: \"The Global AI Summit 2026, organized by the International Technology Foundation, will be held on March 15-17, 2026 in Singapore. The event is expected to attract over 5,000 attendees from 40 countries, featuring keynotes from leading AI researchers and industry leaders.\"",
     "reference": "{\"event_name\": \"Global AI Summit 2026\", \"date\": \"March 15-17, 2026\", \"location\": \"Singapore\", \"organizer\": \"International Technology Foundation\", \"expected_attendees\": \"5,000\"}"
+  },
+  {
+    "task_id": "sum_004",
+    "task_type": "summarization",
+    "prompt": "Summarize in 2 sentences: A team cut cloud costs by removing idle servers. It retained backups and monitored performance to protect reliability.",
+    "reference": "The team cut cloud costs by removing idle servers. It retained backups and monitored performance to protect reliability."
+  },
+  {
+    "task_id": "cls_004",
+    "task_type": "classification",
+    "prompt": "Classify as POSITIVE, NEGATIVE, or NEUTRAL. Reply with only the label. Review: This purchase was excellent and I am delighted.",
+    "reference": "POSITIVE"
+  },
+  {
+    "task_id": "ext_004",
+    "task_type": "extraction",
+    "prompt": "Return only JSON with keys product and quantity. Text: The order contains 12 keyboards.",
+    "reference": "{\"product\": \"keyboards\", \"quantity\": 12}"
+  },
+  {
+    "task_id": "rea_001",
+    "task_type": "reasoning",
+    "prompt": "A service spends $120 per month. Optimization reduces spend by 25 percent. What is the new monthly spend? Explain briefly.",
+    "reference": "The new monthly spend is $90."
+  },
+  {
+    "task_id": "rea_002",
+    "task_type": "reasoning",
+    "prompt": "Each request uses 200 input tokens and 100 output tokens. How many total tokens do 10 requests use? Explain briefly.",
+    "reference": "The requests use 3000 total tokens."
+  },
+  {
+    "task_id": "rea_003",
+    "task_type": "reasoning",
+    "prompt": "A model must have quality at least 0.8. Model A has quality 0.9 and cost $0.01; model B has quality 0.7 and cost $0.001. Which model satisfies the quality requirement?",
+    "reference": "Model A satisfies the quality requirement."
+  },
+  {
+    "task_id": "rea_004",
+    "task_type": "reasoning",
+    "prompt": "A worker handles 6 tasks per hour. How many hours are needed for 24 tasks? Explain briefly.",
+    "reference": "The worker needs 4 hours."
   }
 ]

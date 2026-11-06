@@ -1,12 +1,11 @@
 """Telemetry persistence service — stores execution records as JSONL files.
 
-This is intentionally simple (file-based).  It can be replaced with
-PostgreSQL or another store once the need is justified.
+The local prototype uses file-based persistence behind a service boundary.
+Deployments with additional storage requirements can replace this backend.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional

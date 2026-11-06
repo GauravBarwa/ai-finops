@@ -32,6 +32,8 @@ class ModelInfo(BaseModel):
     output_price_per_1m_tokens: float
     capabilities: list[str] = Field(default_factory=list)
     enabled: bool = True
+    disabled_reason: str | None = None
+    generation_options: dict = Field(default_factory=dict)
 
 
 class ModelRegistry:

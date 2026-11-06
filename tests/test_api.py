@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone
-
 import pytest
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
+from app.api import routes
 from app.llm.registry import ModelInfo, ModelRegistry
 from app.main import create_app
-from app.api import routes
 
 
 @pytest.fixture
@@ -32,19 +29,20 @@ def test_registry() -> ModelRegistry:
 
 
 @pytest.fixture
-def client(test_registry) -> TestClient:
+async def client(test_registry) -> AsyncClient:
     """Create a test client with mocked services."""
     app = create_app()
 
     # Manually initialise services with test registry
     routes.init_services(test_registry)
 
-    return TestClient(app)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
 
 
 class TestHealthEndpoint:
-    def test_health_returns_200(self, client):
-        resp = client.get("/health")
+    async def test_health_returns_200(self, client):
+        resp = await client.get("/health")
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
@@ -52,33 +50,33 @@ class TestHealthEndpoint:
 
 
 class TestModelsEndpoint:
-    def test_list_models(self, client):
-        resp = client.get("/models")
+    async def test_list_models(self, client):
+        resp = await client.get("/models")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] >= 1
         assert len(data["models"]) >= 1
         assert data["models"][0]["model_id"] == "test-model"
 
-    def test_get_model_by_id(self, client):
-        resp = client.get("/models/test-model")
+    async def test_get_model_by_id(self, client):
+        resp = await client.get("/models/test-model")
         assert resp.status_code == 200
         data = resp.json()
         assert data["model_id"] == "test-model"
         assert data["provider"] == "test"
 
-    def test_get_model_not_found(self, client):
-        resp = client.get("/models/nonexistent")
+    async def test_get_model_not_found(self, client):
+        resp = await client.get("/models/nonexistent")
         assert resp.status_code == 404
 
 
 class TestCompareEndpoint:
-    def test_compare_validation_error(self, client):
+    async def test_compare_validation_error(self, client):
         """Empty prompt should be rejected."""
-        resp = client.post("/compare", json={"prompt": ""})
+        resp = await client.post("/compare", json={"prompt": ""})
         assert resp.status_code == 422
 
-    def test_compare_missing_prompt(self, client):
+    async def test_compare_missing_prompt(self, client):
         """Missing prompt should be rejected."""
-        resp = client.post("/compare", json={})
+        resp = await client.post("/compare", json={})
         assert resp.status_code == 422

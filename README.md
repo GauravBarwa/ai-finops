@@ -1,176 +1,257 @@
-# AI FinOps — Intelligent LLM Model Selection & Cost Optimization
+# AI FinOps
 
-A model-agnostic service that compares multiple LLMs on the same workload and captures quality, cost, latency, and reliability metrics — laying the foundation for intelligent routing.
+**Intelligent LLM model selection and cost optimization**
 
-## 🎯 What This Does
+AI FinOps compares language models, evaluates them on a shared benchmark, and routes
+requests using quality, estimated cost, latency, reliability, and context requirements.
+The project provides a FastAPI service and a Gradio demonstration for an HCLTech
+internship prototype.
 
-Given a prompt, this service:
+## Features
 
-1. Sends it to **multiple LLM models** through a unified interface
-2. Captures **tokens, latency, and estimated cost** for each
-3. Returns a **side-by-side comparison** via API or Gradio UI
-4. **Persists telemetry** for reproducible analysis
+- A common interface for native Ollama and LiteLLM providers.
+- Concurrent model comparison with incremental Gradio results and execution telemetry.
+- Six configured active models across Ollama, Gemini, and Groq.
+- Sixteen reference-answer tasks covering summarization, classification, extraction,
+  and reasoning.
+- Persistent model/task profiles with quality, median/p95 latency, estimated cost,
+  reliability, sample counts, and evaluation provenance.
+- Prompt-aware routing with automatic English task detection, lexical benchmark
+  matching, request cost/context estimates, and candidate rejection reasons.
+- Four weighted policies, custom API weights, and a historical task-average mode.
+- Optional execution through the selected model with one eligible fallback.
+- Repeatable provider checks, UI workflow checks, and fixed-model KPI replay.
 
+## How it works
+
+```mermaid
+flowchart LR
+    Tasks[Golden tasks] --> Bench[Benchmark models]
+    Bench --> Logs[Benchmark JSONL]
+    Logs --> Eval[Evaluate answers]
+    Eval --> Profiles[Model profiles]
+    Prompt[Incoming prompt and constraints] --> Analyze[Analyze prompt]
+    Logs --> Analyze
+    Profiles --> Analyze
+    Analyze --> Filter[Filter candidates]
+    Filter --> Rank[Weighted ranking]
+    Rank --> Decision[Recommendation]
+    Decision --> Execute[Optional execution and fallback]
+    Execute --> Telemetry[Execution telemetry]
 ```
-Prompt → Model A, Model B, Model C → Comparative Metrics → Stored Results
-```
 
-## 🏗️ Architecture
+A recommendation uses local measurements and pre-execution estimates. Enabling
+execution sends the prompt to the selected provider. The response exposes the
+historical profile, request estimate, supporting evidence, and selection reasons.
 
-```
-FastAPI (/compare, /models, /health)
-   ↓
-ComparisonService (concurrent model execution)
-   ↓
-LiteLLM (unified provider abstraction)
-   ↓
-┌─────────────┬──────────────┬──────────────┐
-│ Gemini 2.0  │ GPT-4o Mini  │ Claude Haiku │
-│  Flash      │              │              │
-└─────────────┴──────────────┴──────────────┘
-   ↓
-TelemetryService → JSONL files
-```
+## Quick start
 
-## 🚀 Quick Start
+### 1. Install
 
-### Prerequisites
-
-- Python 3.11+
-- API keys for at least one provider (Gemini, OpenAI, or Anthropic)
-
-### Setup
+Python 3.11 or later is required. Run these commands from a terminal.
 
 ```bash
-# Clone and enter project
+git clone https://github.com/GauravBarwa/ai-finops.git
 cd ai-finops
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
-
-# Install dependencies
-pip install -e ".[dev]"
-
-# Configure API keys
-cp .env.example .env
-# Edit .env with your actual API keys
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+[ -f .env ] || cp .env.example .env
 ```
 
-### Run the API Server
+On Windows, create the environment with `py -m venv .venv` and activate it with
+`.venv\Scripts\Activate.ps1` in PowerShell. Copy `.env.example` only when `.env`
+is absent.
+
+Configure the providers you intend to use in `.env`. Gemini and Groq keys are
+optional for a local-only workflow. The model registry lists the exact provider
+identifiers used by the adapters. See the provider and environment configuration
+instructions. [Configuration](docs/configuration.md)
+
+### 2. Start the API
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Visit http://localhost:8000/docs for the interactive API docs.
-
-### Run the Gradio Demo
+Open <http://127.0.0.1:8000/docs> for Swagger UI. The health endpoint confirms
+application and registry initialization.
 
 ```bash
-python -m app.demo
+curl http://127.0.0.1:8000/health
 ```
 
-Visit http://localhost:7860 for the comparison UI.
+### 3. Collect measurements and create profiles
 
-### Run the Benchmark
+A fresh clone contains the benchmark tasks and model configuration. Generated
+measurements and profiles belong to each local environment and are gitignored.
+Smart Router needs measured profiles before it can recommend a model.
+
+For a local Ollama setup, install the model and start the Ollama service using your
+platform's installation procedure.
 
 ```bash
-# All enabled models
-python -m scripts.run_benchmark
-
-# Specific models
-python -m scripts.run_benchmark --models gemini-2.0-flash gpt-4o-mini
+ollama pull llama3.2:latest
+ollama list
+python -m scripts.run_benchmark --models llama3.2-local
+curl -X POST http://127.0.0.1:8000/evaluate \
+  -H 'Content-Type: application/json' \
+  -d '{}'
 ```
 
-### Run Tests
+That benchmark makes 16 local inference calls. Add other verified registry IDs to
+`--models` to collect comparison evidence. For the full configured workload, the
+provider verifier runs 16 tasks against six enabled models and publishes profiles.
 
 ```bash
-pytest tests/ -v
+python -m scripts.verify_providers --publish-profiles
 ```
 
-## 📡 API Endpoints
+Cloud calls consume the provider's available quota. A completed run includes both
+successful and failed outcomes in its profiles, and the verifier exits nonzero when
+any inference call fails. Detailed setup and recovery steps are documented with the
+configuration. [Configuration](docs/configuration.md)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/models` | List all enabled models |
-| `GET` | `/models/{model_id}` | Get single model info |
-| `POST` | `/compare` | Compare prompt across models |
+### 4. Open the demonstration
 
-### Example: Compare Models
+In a second terminal, activate the same virtual environment and start Gradio.
 
 ```bash
-curl -X POST http://localhost:8000/compare \
-  -H "Content-Type: application/json" \
+GRADIO_ANALYTICS_ENABLED=False python -m app.demo
+```
+
+Open <http://127.0.0.1:7860>. The three tabs support comparison, Smart Router, and
+model profile inspection/re-evaluation. Smart Router defaults to `auto` task detection,
+`prompt_aware` routing, and recommendation-only behavior. The demo quality threshold
+is 0.50. Enable **Execute selected model** to generate an answer.
+
+Gradio uses the application services directly and shares the results directory with
+the API. Restart running processes after changing code or model configuration.
+
+## Example requests
+
+Compare a prompt through one explicitly selected model.
+
+```bash
+curl -X POST http://127.0.0.1:8000/compare \
+  -H 'Content-Type: application/json' \
   -d '{
-    "prompt": "Summarize: Cloud computing allows businesses to rent computing resources on demand.",
-    "task_type": "summarization"
+    "prompt": "Classify as POSITIVE, NEGATIVE or NEUTRAL. Reply only with the label. Review: Great product!",
+    "task_type": "classification",
+    "models": ["llama3.2-local"],
+    "max_tokens": 256
   }'
 ```
 
-## 📁 Project Structure
+Request a prompt-aware recommendation using saved measurements.
 
-```
-ai-finops/
-├── app/
-│   ├── api/           # FastAPI routes
-│   ├── core/          # Config, logging, exceptions
-│   ├── llm/           # LLM interface, LiteLLM client, registry, cost
-│   ├── schemas/       # Pydantic request/response models
-│   ├── services/      # Comparison, telemetry, benchmark services
-│   ├── main.py        # FastAPI app factory
-│   └── demo.py        # Gradio demo
-├── data/
-│   ├── benchmark/     # Curated benchmark tasks
-│   ├── models.yaml    # Model registry configuration
-│   └── results/       # Telemetry output (gitignored)
-├── scripts/           # CLI utilities
-├── tests/             # Automated tests
-├── docs/              # Documentation
-├── .env.example       # Environment variable template
-├── pyproject.toml     # Project dependencies
-└── Dockerfile         # Container build
+```bash
+curl -X POST http://127.0.0.1:8000/route \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": "Summarize in 2 lines: Cloud computing lets businesses rent resources on demand and scale with usage.",
+    "task_type": "auto",
+    "routing_mode": "prompt_aware",
+    "policy": "balanced",
+    "constraints": {
+      "min_quality": 0.5,
+      "max_cost": 0.01,
+      "max_latency_ms": 30000,
+      "min_reliability": 0.8
+    },
+    "max_tokens": 512,
+    "execute": false
+  }'
 ```
 
-## ⚙️ Configuration
+Inspect `prompt_analysis`, `selected_model_id`, `ranked_model_ids`, and each
+candidate's `checks`, `estimate`, and `rejection_reasons`. The complete request,
+response, execution, and error contracts are documented separately. [API reference](docs/api.md)
 
-### Models
+## Cost and evaluation assumptions
 
-Models are configured in `data/models.yaml`. Add, remove, or modify models without changing code:
+**Method A shadow pricing** assigns fixed commercial-style USD token rates to every
+model, including local inference. These assumptions let cost optimization operate
+with free-tier and local providers. Actual costs depend on account billing, quotas,
+and local infrastructure. Shadow rates are configured in `data/models.yaml`.
 
-```yaml
-models:
-  - model_id: "gemini-2.0-flash"
-    provider: "google"
-    display_name: "Gemini 2.0 Flash"
-    litellm_model_name: "gemini/gemini-2.0-flash"
-    input_price_per_1m_tokens: 0.10
-    output_price_per_1m_tokens: 0.40
-    enabled: true
+Quality uses deterministic reference scoring. Prompt-aware quality blends relevant
+benchmark observations with the task prior. Lexical similarity, token estimates,
+and token-scaled latency are heuristics with limited coverage. The UI exposes
+fallbacks and uncertainty. Hard constraints apply to the selected metric basis,
+and fallback execution can add another call's cost. [Routing and evaluation methodology](docs/prompt_routing.md)
+
+## Verification
+
+Run the offline regression suite and lint checks.
+
+```bash
+GRADIO_ANALYTICS_ENABLED=False pytest -q
+ruff check .
 ```
 
-### Environment Variables
+The implementation baseline recorded 147 passing tests, 37 broader Gradio HTTP
+workflow checks, and 23 focused prompt-routing checks. Live results are historical
+observations from 5 November 2026 and vary with provider access and quota.
+The release documentation records the checks rerun for publication.
+[UI verification](docs/ui_verification.md)
 
-See `.env.example` for all configuration options.
+After preparing full profiles, the workflow scripts can reproduce the HTTP checks.
+The `--live` option also submits inference requests.
 
-## 🔒 Security
+```bash
+GRADIO_ANALYTICS_ENABLED=False python -m scripts.verify_ui
+GRADIO_ANALYTICS_ENABLED=False python -m scripts.verify_prompt_routing
+# Optional live checks
+GRADIO_ANALYTICS_ENABLED=False python -m scripts.verify_prompt_routing --live
+```
 
-- API keys loaded from environment variables — never committed
-- Only public/synthetic data used for benchmarks
-- Telemetry files are gitignored
-- No confidential data processed without explicit approval
+The saved KPI report describes a nine-task historical task-average replay. Its
+95.96% shadow cost reduction came with substantially higher median latency.
+The report records the workload, scoring assumptions, and coverage.
+[KPI report](docs/kpi_report.md)
 
-## 📌 Current Phase
+## Documentation
 
-This is the **Pre-HCL-Alignment Phase** — a minimal technical proof. The foundation is ready for:
+- Component boundaries, data flows, storage, and execution behavior. [Architecture](docs/architecture.md)
+- Provider setup, environment variables, benchmark commands, containers, and troubleshooting. [Configuration](docs/configuration.md)
+- Endpoint payloads, defaults, response fields, and failure handling. [API reference](docs/api.md)
+- Prompt analysis, estimator formulas, policy weights, and evaluation limits. [Routing methodology](docs/prompt_routing.md)
+- A preparation checklist, live walkthrough, and mentor question guide. [Demo guide](docs/demo_guide.md)
+- Historical provider observations and reproduction commands. [Provider verification](docs/provider_verification.md)
+- UI workflow coverage and publication validation. [UI verification](docs/ui_verification.md)
+- Development workflow, tests, and contribution requirements. [Contributing](CONTRIBUTING.md)
 
-- Intelligent routing (constraint-based model selection)
-- Quality evaluation (LLM-as-judge, deterministic metrics)
-- Full benchmark suite
-- Enterprise integration with HCL infrastructure
+## Repository layout
+
+```text
+app/
+  api/          FastAPI routes
+  core/         Settings, exceptions, logging
+  domain/       Prompt analysis, hard constraints, weighted ranking
+  evaluation/   Deterministic reference scorers
+  llm/          Provider adapters, registry, shadow cost calculation
+  schemas/      Request, response, profile, and estimate contracts
+  services/     Comparison, benchmarks, evaluation, publication, routing, telemetry
+  demo.py       Three-tab Gradio demonstration
+data/
+  benchmark/    Sixteen public/synthetic golden tasks
+  models.yaml   Configured providers, capabilities, and shadow rates
+scripts/        Benchmark, profile publication, verification, and KPI CLIs
+tests/          Offline regression coverage
+docs/           Setup, architecture, API, methodology, demo, and reports
+```
+
+## Operational scope
+
+The service targets a local prototype with file-based storage. Public deployment
+requires authentication, restricted network exposure, and an appropriate CORS policy.
+Prompts and responses are stored in local telemetry. Use approved demonstration data,
+protect provider credentials, and review generated artifacts before sharing them.
+
+The application uses modular Python, FastAPI, Pydantic, httpx, LiteLLM, and Gradio.
+The present pipeline fits within these components and JSON/JSONL storage.
 
 ## License
 
-MIT
+MIT. [License](LICENSE)

@@ -1,8 +1,8 @@
 """Cost estimation utilities.
 
-All values are **estimated** based on publicly available provider pricing
-stored in the model registry configuration.  Actual enterprise costs may
-differ.
+All values are **estimated** using Method A shadow commercial USD assumptions
+stored in the model registry configuration. Free-tier and local actual billing
+may be zero; these experimental prices are not verified current quotes.
 """
 
 from __future__ import annotations

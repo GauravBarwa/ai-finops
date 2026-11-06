@@ -14,8 +14,8 @@ env/
 
 # ── Environment / Secrets ────────────────────
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # ── IDE ───────────────────────────────────────
 .vscode/

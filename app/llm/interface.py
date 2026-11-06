@@ -51,6 +51,11 @@ class LLMResponse:
     error: Optional[str] = None
     raw_response: Any = field(default=None, repr=False)
 
+    def __post_init__(self) -> None:
+        """Keep the aggregate token count correct for adapters that omit it."""
+        if self.total_tokens == 0 and (self.input_tokens or self.output_tokens):
+            self.total_tokens = self.input_tokens + self.output_tokens
+
 
 class LLMClient(abc.ABC):
     """Abstract base class for LLM provider clients.
@@ -76,7 +81,7 @@ class LLMClient(abc.ABC):
         prompt:
             The user prompt / instruction.
         model:
-            The LiteLLM-compatible model string (e.g. ``gemini/gemini-2.0-flash``).
+            The LiteLLM-compatible model string (e.g. ``gemini/gemini-3.6-flash``).
         max_tokens:
             Maximum tokens to generate.
         temperature:

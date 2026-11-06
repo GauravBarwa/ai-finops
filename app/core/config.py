@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # ── Project root ──────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -29,9 +29,17 @@ class Settings(BaseSettings):
     # ── LLM provider keys ────────────────────────────────────────────────────
     openai_api_key: str = ""
     gemini_api_key: str = ""
+    groq_api_key: str = ""
+    github_api_key: str = ""
     anthropic_api_key: str = ""
 
+    # ── Local Ollama ────────────────────────────────────────────────────────
+    # The local prototype does not require any paid provider credentials.
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_timeout_seconds: float = 180.0
+
     # ── Application ──────────────────────────────────────────────────────────
+    comparison_timeout_seconds: float = Field(default=60, gt=0, le=600)
     app_env: str = "development"
     log_level: str = "INFO"
 
@@ -79,6 +87,8 @@ def get_settings() -> Settings:
     _env_map = {
         "OPENAI_API_KEY": settings.openai_api_key,
         "GEMINI_API_KEY": settings.gemini_api_key,
+        "GROQ_API_KEY": settings.groq_api_key,
+        "GITHUB_API_KEY": settings.github_api_key,
         "ANTHROPIC_API_KEY": settings.anthropic_api_key,
     }
     for key, value in _env_map.items():

@@ -1,23 +1,26 @@
-"""FastAPI route definitions for the AI FinOps service.
+"""FastAPI endpoints for model metadata, comparison, evaluation, profiles, and routing.
 
-Endpoints
----------
-POST /compare   — Compare a prompt across multiple models
-GET  /models    — List all enabled models
-GET  /models/{model_id} — Get a single model's info
-GET  /health    — Health check
+GET /health confirms initialization. GET /models and GET /models/{model_id} expose
+registry metadata. POST /compare executes selected models. POST /evaluate scores
+saved benchmark runs, GET /profiles reads their profiles, and POST /route recommends
+or executes a model using prompt analysis, measured evidence, and constraints.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
-from app.core.exceptions import ModelNotFoundError
-from app.llm.litellm_client import LiteLLMClient
+from app.core.exceptions import BenchmarkError, ModelNotFoundError
+from app.llm.interface import LLMClient
+from app.llm.provider_client import ProviderRouterClient
 from app.llm.registry import ModelRegistry
 from app.schemas.comparison import CompareRequest, CompareResponse
 from app.schemas.model import ModelInfoResponse, ModelListResponse
+from app.schemas.profile import EvaluateRequest, ProfilesResponse
+from app.schemas.routing import RouteRequest, RouteResponse
 from app.services.comparison_service import ComparisonService
+from app.services.evaluation_service import EvaluationService
+from app.services.router_service import RouterService
 from app.services.telemetry_service import TelemetryService
 
 router = APIRouter()
@@ -26,16 +29,31 @@ router = APIRouter()
 _registry: ModelRegistry | None = None
 _comparison_service: ComparisonService | None = None
 _telemetry_service: TelemetryService | None = None
+_evaluation_service: EvaluationService | None = None
+_router_service: RouterService | None = None
 
 
-def init_services(registry: ModelRegistry) -> None:
+def init_services(
+    registry: ModelRegistry,
+    llm_client: LLMClient | None = None,
+    telemetry_service: TelemetryService | None = None,
+    evaluation_service: EvaluationService | None = None,
+) -> None:
     """Initialise service singletons.  Called once at app startup."""
-    global _registry, _comparison_service, _telemetry_service
+    global _registry, _comparison_service, _telemetry_service, _evaluation_service
 
+    global _router_service
     _registry = registry
-    llm_client = LiteLLMClient()
+    llm_client = llm_client or ProviderRouterClient()
     _comparison_service = ComparisonService(llm_client=llm_client, registry=registry)
-    _telemetry_service = TelemetryService()
+    _telemetry_service = telemetry_service or TelemetryService()
+    _evaluation_service = evaluation_service or EvaluationService(registry=registry)
+    _router_service = RouterService(
+        llm_client,
+        registry,
+        _evaluation_service,
+        _telemetry_service,
+    )
 
 
 def _get_registry() -> ModelRegistry:
@@ -58,6 +76,7 @@ def _get_telemetry_service() -> TelemetryService:
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
+
 @router.get("/health", tags=["system"])
 async def health_check():
     """Simple health check endpoint."""
@@ -70,6 +89,7 @@ async def health_check():
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
+
 
 @router.get("/models", response_model=ModelListResponse, tags=["models"])
 async def list_models():
@@ -86,6 +106,7 @@ async def list_models():
             output_price_per_1m_tokens=m.output_price_per_1m_tokens,
             capabilities=m.capabilities,
             enabled=m.enabled,
+            disabled_reason=m.disabled_reason,
         )
         for m in models
     ]
@@ -112,10 +133,12 @@ async def get_model(model_id: str):
         output_price_per_1m_tokens=m.output_price_per_1m_tokens,
         capabilities=m.capabilities,
         enabled=m.enabled,
+        disabled_reason=m.disabled_reason,
     )
 
 
 # ── Compare ───────────────────────────────────────────────────────────────────
+
 
 @router.post("/compare", response_model=CompareResponse, tags=["compare"])
 async def compare_models(request: CompareRequest):
@@ -132,3 +155,32 @@ async def compare_models(request: CompareRequest):
     telemetry.save_comparison(response)
 
     return response
+
+
+@router.post("/evaluate", response_model=ProfilesResponse, tags=["evaluation"])
+async def evaluate_models(request: EvaluateRequest):
+    """Score saved benchmarks; no live model calls are made."""
+    if _evaluation_service is None:
+        raise RuntimeError("Services not initialised")
+    try:
+        return _evaluation_service.evaluate(request.run_files)
+    except (ValueError, OSError, BenchmarkError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/profiles", response_model=ProfilesResponse, tags=["evaluation"])
+async def list_profiles():
+    if _evaluation_service is None:
+        raise RuntimeError("Services not initialised")
+    try:
+        return _evaluation_service.load_profiles()
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/route", response_model=RouteResponse, tags=["routing"])
+async def route_request(request: RouteRequest):
+    """Recommend or execute with hard constraints and one ranked fallback."""
+    if _router_service is None:
+        raise RuntimeError("Services not initialised")
+    return await _router_service.route(request)

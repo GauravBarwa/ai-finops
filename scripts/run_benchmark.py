@@ -7,7 +7,7 @@ Usage::
     python -m scripts.run_benchmark
 
     # Run against specific models
-    python -m scripts.run_benchmark --models gemini-2.0-flash gpt-4o-mini
+    python -m scripts.run_benchmark --models llama3.2-local gpt-oss-120b-cloud
 
     # Custom benchmark file
     python -m scripts.run_benchmark --tasks data/benchmark/tasks.json
@@ -23,16 +23,15 @@ from pathlib import Path
 # Ensure project root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.config import get_settings
 from app.core.logging import setup_logging
-from app.llm.litellm_client import LiteLLMClient
+from app.llm.provider_client import ProviderRouterClient
 from app.llm.registry import ModelRegistry
 from app.services.benchmark_service import BenchmarkService
+from app.services.statistics import latency_summary
 
 
 async def main(args: argparse.Namespace) -> None:
     logger = setup_logging()
-    settings = get_settings()
 
     logger.info("=" * 60)
     logger.info("AI FinOps — Benchmark Runner")
@@ -51,7 +50,7 @@ async def main(args: argparse.Namespace) -> None:
 
     # Load tasks
     tasks_path = Path(args.tasks) if args.tasks else None
-    client = LiteLLMClient()
+    client = ProviderRouterClient()
     service = BenchmarkService(llm_client=client, registry=registry)
 
     tasks = service.load_tasks(tasks_path)
@@ -78,7 +77,7 @@ async def main(args: argparse.Namespace) -> None:
     from collections import defaultdict
     model_stats: dict[str, dict] = defaultdict(lambda: {
         "calls": 0, "success": 0, "total_tokens": 0,
-        "total_cost": 0.0, "total_latency": 0.0,
+        "total_cost": 0.0, "total_latency": 0.0, "latencies": [],
     })
 
     for r in records:
@@ -88,18 +87,22 @@ async def main(args: argparse.Namespace) -> None:
         s["total_tokens"] += r.total_tokens
         s["total_cost"] += r.estimated_cost
         s["total_latency"] += r.latency_ms
+        s["latencies"].append(r.latency_ms)
 
     for model_id, stats in model_stats.items():
         avg_latency = stats["total_latency"] / max(stats["calls"], 1)
+        percentiles = latency_summary(stats["latencies"])
         logger.info(
             "  %-25s  calls=%d  success=%d  tokens=%d  "
-            "est_cost=$%.6f  avg_latency=%.0fms",
+            "est_cost=$%.6f  avg_latency=%.0fms p50=%.0fms p95=%.0fms",
             model_id,
             stats["calls"],
             stats["success"],
             stats["total_tokens"],
             stats["total_cost"],
             avg_latency,
+            percentiles["median_latency_ms"],
+            percentiles["p95_latency_ms"],
         )
 
     logger.info("")
