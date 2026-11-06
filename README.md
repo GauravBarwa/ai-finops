@@ -7,6 +7,10 @@ requests using quality, estimated cost, latency, reliability, and context requir
 The project provides a FastAPI service and a Gradio demonstration for an HCLTech
 internship prototype.
 
+For a guided explanation of the problem, every component, the design choices, and
+an example routing decision, start with the project walkthrough.
+[Project walkthrough](docs/project_walkthrough.md)
+
 ## Features
 
 - A common interface for native Ollama and LiteLLM providers.
@@ -190,10 +194,11 @@ GRADIO_ANALYTICS_ENABLED=False pytest -q
 ruff check .
 ```
 
-The implementation baseline recorded 147 passing tests, 37 broader Gradio HTTP
-workflow checks, and 23 focused prompt-routing checks. Live results are historical
-observations from 5 November 2026 and vary with provider access and quota.
-The release documentation records the checks rerun for publication.
+The 6 November 2026 bug audit recorded 169 passing tests and 31 Gradio HTTP workflow
+checks, plus browser checks across all three tabs and a live local Ollama call.
+Earlier checks recorded 37 broader workflows and 23 focused prompt-routing workflows.
+Cloud inference observations are historical and vary with provider access and quota.
+The verification report records the scope and limitations of each run.
 [UI verification](docs/ui_verification.md)
 
 After preparing full profiles, the workflow scripts can reproduce the HTTP checks.
@@ -213,6 +218,7 @@ The report records the workload, scoring assumptions, and coverage.
 
 ## Documentation
 
+- A guided explanation of the problem, components, design decisions, and worked examples. [Project walkthrough](docs/project_walkthrough.md)
 - Component boundaries, data flows, storage, and execution behavior. [Architecture](docs/architecture.md)
 - Provider setup, environment variables, benchmark commands, containers, and troubleshooting. [Configuration](docs/configuration.md)
 - Endpoint payloads, defaults, response fields, and failure handling. [API reference](docs/api.md)

@@ -111,7 +111,7 @@ is divided by the total weight. Model ID resolves exact final score ties.
 - `quality_first` uses quality 0.65, reliability 0.15, cost 0.10, and latency 0.10.
 - `latency_first` uses latency 0.65, quality 0.20, cost 0.10, and reliability 0.05.
 
-Custom API weights override the preset and must have a positive total. These policies
+Custom API weights override the preset and must have a finite positive total. These policies
 combine preferences, so the same model can remain preferred across several prompts or
 policies when the eligible set and measurements favor it.
 

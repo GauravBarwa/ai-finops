@@ -42,7 +42,7 @@ Executes one prompt across the selected registry IDs.
 }
 ```
 
-- `prompt` is a required string with at least one character.
+- `prompt` is a required string containing at least one non-whitespace character.
 - `task_type` is an optional free-form workload label for comparison telemetry.
 - `models` defaults to all enabled registry IDs when omitted, null, or empty.
 - `max_tokens` defaults to 1024 and accepts integers from 1 through 8192.

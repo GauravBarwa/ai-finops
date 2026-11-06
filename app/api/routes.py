@@ -151,7 +151,7 @@ async def compare_models(request: CompareRequest):
 
     response = await service.compare(request)
 
-    # Persist telemetry asynchronously (fire-and-forget for now)
+    # Persist the completed comparison before returning its response.
     telemetry.save_comparison(response)
 
     return response

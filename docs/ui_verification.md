@@ -15,6 +15,23 @@ validation remains open because the publication environment lacks a Docker execu
 Container setup commands are documented for an environment with Docker available.
 [Configuration](configuration.md)
 
+## Final repository review
+
+The mentor-sharing review on 6 November 2026 reran all **169 tests** in an isolated
+copy of the GitHub checkout with the review changes applied. That copy contained
+no `.env`, profiles, or raw benchmark measurements. Application startup, API metadata
+and validation, missing-profile/run guidance, and callbacks for all three UI tabs
+passed. All six CLI help entry points and an isolated Python wheel build passed.
+Ruff, documentation links, JSON examples, and diff whitespace checks passed.
+
+The review also checked tracked generated-state exclusions and common credential
+patterns in Git history. The new project walkthrough explains the components and
+selection logic, while the README and API/methodology descriptions reflect the
+latest regression coverage and validation rules. Provider inference was covered
+by the earlier checks described below. Docker runtime verification remains open
+because Docker is unavailable in this environment.
+[Project walkthrough](project_walkthrough.md)
+
 ## Historical Gradio HTTP checks
 
 Live checks on 5 November 2026 used temporary local Gradio servers and repeated
