@@ -252,6 +252,3 @@ protect provider credentials, and review generated artifacts before sharing them
 The application uses modular Python, FastAPI, Pydantic, httpx, LiteLLM, and Gradio.
 The present pipeline fits within these components and JSON/JSONL storage.
 
-## License
-
-MIT. [License](LICENSE)
