@@ -16,6 +16,7 @@ from gradio_client import Client
 from app.core.config import get_settings
 from app.demo import build_demo
 from app.services.benchmark_service import BenchmarkService
+from app.ui import LAUNCH_OPTIONS
 from scripts.verify_ui import TASK_PROMPTS
 
 
@@ -26,7 +27,8 @@ def verify(args):
     proof = []
     try:
         demo.launch(
-            server_name="127.0.0.1", server_port=args.port, prevent_thread_lock=True, quiet=True
+            server_name="127.0.0.1", server_port=args.port, prevent_thread_lock=True, quiet=True,
+            **LAUNCH_OPTIONS,
         )
         client = Client(f"http://127.0.0.1:{args.port}/", verbose=False)
 

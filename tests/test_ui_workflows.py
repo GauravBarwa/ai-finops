@@ -84,6 +84,13 @@ def ui(tmp_path):
         registry=registry, llm_client=client, evaluation=evaluation, telemetry=telemetry
     )
     functions = {f.fn.__name__: f.fn for f in demo.fns.values() if f.fn}
+    route_stream = functions["smart_route"]
+
+    async def route_final(*args, **kwargs):
+        outputs = [output async for output in route_stream(*args, **kwargs)]
+        return outputs[-1]
+
+    functions["smart_route"] = route_final
     return demo, functions, evaluation, client, telemetry
 
 
@@ -226,6 +233,42 @@ async def test_live_route_fallback_and_failed_attempts(ui):
     )
     assert "**Status:** execution_failed" in badge
     assert "first failed" in live and "second failed" in live
+
+
+@pytest.mark.asyncio
+async def test_route_reveals_markdown_without_changing_answer(ui):
+    demo, _, _, client, _ = ui
+    answer = "## Summary\n\n- **Lower cost**\n- Better reliability\n\n```python\nprint('ok')\n```"
+    client.generate.return_value = LLMResponse(content=answer)
+    route = next(f.fn for f in demo.fns.values() if f.fn and f.fn.__name__ == "smart_route")
+    outputs = [
+        output
+        async for output in route(
+            "Summarize cloud computing.", "auto", "balanced", 0.5, 0.005, 30000, 0.8, True
+        )
+    ]
+    assert len(outputs) > 2
+    assert outputs[-1][2] == answer
+    assert all(answer.startswith(output[2]) for output in outputs)
+    assert all(len(a[2]) < len(b[2]) for a, b in zip(outputs, outputs[1:]))
+
+
+@pytest.mark.asyncio
+async def test_comparison_reveals_markdown_and_keeps_full_error(ui):
+    _, functions, _, client, _ = ui
+    answer = "## Findings\n\n**Reliable** and inexpensive."
+    error = "Provider failed | " + "Long diagnostic message. " * 20 + "```\nDetails"
+
+    async def generate(prompt, model, **kwargs):
+        if model.endswith("fast"):
+            return LLMResponse(success=False, error=error)
+        return LLMResponse(content=answer)
+
+    client.generate.side_effect = generate
+    outputs = [item async for item in functions["_compare"]("Prompt", "auto", [], 1024)]
+    assert len(outputs) > 3
+    assert answer in outputs[-1][2] and error in outputs[-1][2]
+    assert " ".join(error.split()) in outputs[-1][1][1][-1]
 
 
 @pytest.mark.asyncio

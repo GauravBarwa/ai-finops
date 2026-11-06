@@ -5,6 +5,10 @@
 Create a Python 3.11+ virtual environment and install the project with the development
 extra when running the checks.
 
+The refreshed UI uses Gradio 6.28 or later within major version 6. Reinstall the project
+dependencies when updating an older environment. Presentation settings live in
+`app/ui.py` and are supplied at launch by the UI module and verification scripts.
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate

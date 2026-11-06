@@ -12,6 +12,9 @@ Or alongside the FastAPI server::
 
 from __future__ import annotations
 
+import asyncio
+import re
+
 import gradio as gr
 
 from app.core.exceptions import BenchmarkError
@@ -26,11 +29,30 @@ from app.services.comparison_service import ComparisonService
 from app.services.evaluation_service import EvaluationService
 from app.services.router_service import RouterService
 from app.services.telemetry_service import TelemetryService
+from app.ui import LAUNCH_OPTIONS
 
 COMPARISON_HEADERS = ["Model", "Provider", "Tokens (in/out)", "Latency", "Est. cost USD", "Status"]
 
 
-def format_comparison(response: CompareResponse) -> tuple[str, list[list[str]], str]:
+def markdown_text(text: str) -> str:
+    """Keep provider failures literal, even when they contain Markdown fences."""
+    longest_run = max((len(match[0]) for match in re.finditer(r"`+", text)), default=0)
+    fence = "`" * max(3, longest_run + 1)
+    return f"{fence}text\n{text}\n{fence}"
+
+
+async def reveal_answer(text: str):
+    """Animate completed answers in bounded frames while preserving their exact Markdown."""
+    step = max(1, (len(text) + 31) // 32)
+    for end in range(step, len(text), step):
+        yield text[:end]
+        await asyncio.sleep(0.025)
+    yield text
+
+
+def format_comparison(
+    response: CompareResponse, visible_answers: dict[str, str] | None = None
+) -> tuple[str, list[list[str]], str]:
     """Keep provider text out of Markdown tables and show pending work explicitly."""
     pending = response.total_models - len(response.results)
     summary = (
@@ -43,7 +65,7 @@ def format_comparison(response: CompareResponse) -> tuple[str, list[list[str]], 
         status = (
             "Succeeded"
             if result.success
-            else "Failed: " + " ".join((result.error or "Unknown error").split())[:180]
+            else "Failed: " + " ".join((result.error or "Unknown error").split())
         )
         rows.append(
             [
@@ -55,12 +77,17 @@ def format_comparison(response: CompareResponse) -> tuple[str, list[list[str]], 
                 status,
             ]
         )
-        details.append(
-            f"{result.display_name} ({result.provider}) — "
-            f"{'Succeeded' if result.success else 'Failed'}\n"
-            f"{result.response if result.success else result.error}"
+        answer = (
+            visible_answers.get(result.model_id, result.response)
+            if visible_answers is not None
+            else result.response
         )
-    return summary, rows, "\n\n".join(details)
+        details.append(
+            f"## {result.display_name} ({result.provider})\n\n"
+            f"{'Succeeded' if result.success else 'Failed'}\n\n"
+            f"{answer if result.success else markdown_text(result.error or 'Unknown error')}"
+        )
+    return summary, rows, "\n\n---\n\n".join(details)
 
 
 def describe_profiles(
@@ -123,6 +150,7 @@ def build_demo(
         max_tokens=1024,
         routing_mode="prompt_aware",
     ):
+        yield "Evaluating your request…", [], ""
         try:
             decision = await routing.route(
                 RouteRequest(
@@ -141,7 +169,8 @@ def build_demo(
                 )
             )
         except (ValueError, TypeError, OverflowError) as exc:
-            return f"**Status:** invalid_request  \n{exc}", [], "No provider was called."
+            yield f"**Status:** invalid_request  \n{exc}", [], "No provider was called."
+            return
         rows = []
         for candidate in decision.candidates:
             p, e = candidate.profile, candidate.estimate
@@ -187,7 +216,13 @@ def build_demo(
             live = "Recommendation only. Enable Execute selected model to generate a response."
         elif decision.status == "no_candidate":
             live = decision.explanation
-        return badge, rows, live
+        if decision.status == "succeeded":
+            async for partial in reveal_answer(live):
+                yield badge, rows, partial
+        else:
+            if decision.status == "execution_failed":
+                live = markdown_text(live)
+            yield badge, rows, live
 
     def read_profile_view(task_type="summarization"):
         try:
@@ -199,11 +234,11 @@ def build_demo(
             [
                 p.model_id,
                 p.task_type,
-                p.quality_score,
-                p.median_latency_ms,
-                p.p95_latency_ms,
-                p.avg_estimated_cost,
-                p.reliability_rate,
+                round(p.quality_score, 3),
+                round(p.median_latency_ms, 2),
+                round(p.p95_latency_ms, 2),
+                f"{p.avg_estimated_cost:.8f}",
+                round(p.reliability_rate, 3),
                 p.sample_count,
             ]
             for p in snapshot.profiles
@@ -241,168 +276,205 @@ def build_demo(
         except (ValueError, TypeError, OverflowError) as exc:
             yield f"Invalid request: {exc}", [], "No provider was called."
             return
+        visible_answers = {}
         async for response in service.stream_compare(request):
+            new_results = [r for r in response.results if r.model_id not in visible_answers]
+            for result in new_results:
+                visible_answers[result.model_id] = ""
+                if result.success:
+                    async for partial in reveal_answer(result.response):
+                        visible_answers[result.model_id] = partial
+                        yield format_comparison(response, visible_answers)
             yield format_comparison(response)
         telemetry.save_comparison(response)
 
-    # ── Build the UI ─────────────────────────────────────────────────────
-    with gr.Blocks(
-        title="AI FinOps — Model Comparison",
-    ) as demo:
+    # Keep results at full width so model names, costs, and rejection reasons are readable.
+    with gr.Blocks(title="AI FinOps") as demo:
         gr.Markdown(
-            "# 🔬 AI FinOps — Multi-Model Comparison\n"
-            "Compare the same prompt across multiple LLMs. "
-            "See tokens, latency, and estimated cost side-by-side."
+            "# AI FinOps\n\nModel evaluation and request routing, backed by measured evidence.",
+            elem_id="finops-header",
         )
 
         with gr.Tab("Comparison"):
-            with gr.Row():
-                with gr.Column(scale=2):
+            gr.Markdown(
+                "### Compare model performance\nRun one prompt across your selected models."
+            )
+            with gr.Row(equal_height=True):
+                with gr.Column(scale=3, min_width=320, elem_classes="finops-panel"):
                     prompt_input = gr.Textbox(
-                        label="Prompt",
-                        placeholder="Enter your prompt here...",
-                        lines=5,
+                        label="Prompt", placeholder="Enter a task or instruction…", lines=6
                     )
-                    task_type_input = gr.Dropdown(
-                        label="Task Type",
-                        choices=[
-                            "auto",
-                            "summarization",
-                            "classification",
-                            "extraction",
-                            "reasoning",
-                        ],
-                        value="auto",
-                    )
+                    with gr.Row():
+                        task_type_input = gr.Dropdown(
+                            label="Task Type",
+                            choices=[
+                                "auto",
+                                "summarization",
+                                "classification",
+                                "extraction",
+                                "reasoning",
+                            ],
+                            value="auto",
+                        )
+                        token_limit = gr.Slider(
+                            64,
+                            2048,
+                            step=64,
+                            value=1024,
+                            label="Maximum output tokens (including reasoning where applicable)",
+                        )
+                with gr.Column(scale=2, min_width=280, elem_classes="finops-panel"):
                     model_selector = gr.CheckboxGroup(
-                        label="Models (leave empty for all enabled)",
-                        choices=model_choices,
-                    )
-                    token_limit = gr.Slider(
-                        minimum=64,
-                        maximum=2048,
-                        step=64,
-                        value=1024,
-                        label="Maximum output tokens (including reasoning where applicable)",
+                        label="Models (leave empty for all enabled)", choices=model_choices
                     )
                     gr.Markdown(
-                        "Results appear as each model finishes. "
-                        "GitHub Models is excluded because its inference service was retired."
+                        "Results update as each model finishes. Costs use configured shadow rates.",
+                        elem_classes="finops-note",
                     )
-                    compare_btn = gr.Button("🚀 Compare Models", variant="primary")
-
-                with gr.Column(scale=3):
-                    summary_output = gr.Markdown(label="Summary")
-                    comparison_table = gr.Dataframe(
-                        headers=COMPARISON_HEADERS,
-                        datatype=["str"] * 6,
-                        interactive=False,
-                        label="Model results",
-                    )
-                    detail_output = gr.Textbox(label="Full responses and errors", lines=18)
-
+                    compare_btn = gr.Button("Compare models", variant="primary")
+            summary_output = gr.Markdown(elem_classes="finops-section")
+            comparison_table = gr.Dataframe(
+                headers=COMPARISON_HEADERS,
+                datatype=["str"] * 6,
+                interactive=False,
+                label="Model results",
+                wrap=True,
+                max_height=600,
+                column_widths=["22%", "10%", "12%", "10%", "14%", "32%"],
+                elem_classes="results-table",
+            )
+            gr.Markdown("### Model responses", elem_classes="finops-section")
+            detail_output = gr.Markdown(
+                label="Full responses and errors",
+                sanitize_html=True,
+                elem_classes="response-panel",
+            )
             compare_btn.click(
                 fn=_compare,
                 inputs=[prompt_input, task_type_input, model_selector, token_limit],
                 outputs=[summary_output, comparison_table, detail_output],
             )
-
-            # Example prompts
-            gr.Examples(
-                examples=[
-                    [
-                        "Summarize in 2 sentences: Cloud computing allows businesses to rent "
-                        "computing resources on demand instead of maintaining expensive servers. "
-                        "This pay-as-you-go model has enabled startups to launch products without "
-                        "massive capital investment.",
-                        "summarization",
-                        [],
-                        1024,
+            with gr.Accordion("Sample prompts", open=False):
+                gr.Examples(
+                    examples=[
+                        [
+                            "Summarize in 2 sentences: Cloud computing allows businesses to rent "
+                            "computing resources on demand instead of maintaining expensive "
+                            "servers. This pay-as-you-go model has enabled startups to launch "
+                            "products without "
+                            "massive capital investment.",
+                            "summarization",
+                            [],
+                            1024,
+                        ],
+                        [
+                            "Classify the sentiment as POSITIVE, NEGATIVE, or NEUTRAL:\n\n"
+                            '"Great product, fast shipping, exactly as described!"',
+                            "classification",
+                            [],
+                            1024,
+                        ],
                     ],
-                    [
-                        "Classify the sentiment as POSITIVE, NEGATIVE, or NEUTRAL:\n\n"
-                        '"Great product, fast shipping, exactly as described!"',
-                        "classification",
-                        [],
-                        1024,
-                    ],
-                ],
-                inputs=[prompt_input, task_type_input, model_selector, token_limit],
-            )
+                    inputs=[prompt_input, task_type_input, model_selector, token_limit],
+                )
 
         with gr.Tab("Smart Router"):
             gr.Markdown(
-                "Analyze your prompt before selecting a model: task intent, size, "
-                "related benchmark evidence, cost budget and context limits. "
-                "Quality/latency are estimates until a response is measured."
+                "### Route a request\n"
+                "Choose a model using your prompt, saved evidence, and requirements."
             )
-            route_prompt = gr.Textbox(label="Prompt", lines=4)
-            route_task = gr.Dropdown(
-                choices=["auto", "summarization", "classification", "extraction", "reasoning"],
-                value="auto",
-                label="Task type",
+            route_prompt = gr.Textbox(
+                label="Prompt",
+                lines=5,
+                placeholder="Describe the task and include its source text…",
             )
-            routing_basis = gr.Dropdown(
-                choices=[
-                    ("Prompt-aware estimates", "prompt_aware"),
-                    ("Historical task averages (baseline)", "task_average"),
-                ],
-                value="prompt_aware",
-                label="Routing basis",
-            )
-            route_policy = gr.Dropdown(
-                choices=["cost_first", "balanced", "quality_first", "latency_first"],
-                value="balanced",
-                label="Policy",
-            )
-            quality = gr.Slider(0, 1, value=0.5, step=0.01, label="Minimum quality")
-            gr.Markdown(
-                "Demo default quality is 0.50 on the reference scorer. "
-                "Higher limits can legitimately leave no eligible model. "
-                "Your constraints are never changed automatically."
-            )
-            task_hint = gr.Markdown(value=read_profile_view("auto")[1])
-            route_task.change(task_profile_hint, inputs=route_task, outputs=task_hint)
-            cost = gr.Number(
-                value=0.01,
-                minimum=0,
-                step=0.00000001,
-                precision=8,
-                label="Maximum estimated cost (USD/request)",
-            )
-            latency = gr.Slider(
-                0, 180000, value=30000, step=1, label="Maximum median latency (ms)"
-            )
-            reliability = gr.Slider(0, 1, value=0.8, step=0.01, label="Minimum reliability")
-            execute = gr.Checkbox(value=False, label="Execute selected model (uses provider quota)")
-            route_token_limit = gr.Slider(
-                64,
-                2048,
-                step=64,
-                value=1024,
-                label="Maximum output tokens",
-            )
+            with gr.Row():
+                route_task = gr.Dropdown(
+                    choices=["auto", "summarization", "classification", "extraction", "reasoning"],
+                    value="auto",
+                    label="Task type",
+                )
+                routing_basis = gr.Dropdown(
+                    choices=[
+                        ("Prompt-aware estimates", "prompt_aware"),
+                        ("Historical task averages (baseline)", "task_average"),
+                    ],
+                    value="prompt_aware",
+                    label="Routing basis",
+                )
+                route_policy = gr.Dropdown(
+                    choices=["cost_first", "balanced", "quality_first", "latency_first"],
+                    value="balanced",
+                    label="Policy",
+                )
+            with gr.Group(elem_classes="finops-panel"):
+                gr.Markdown("#### Requirements")
+                with gr.Row():
+                    with gr.Column(min_width=280):
+                        quality = gr.Slider(0, 1, value=0.5, step=0.01, label="Minimum quality")
+                        reliability = gr.Slider(
+                            0, 1, value=0.8, step=0.01, label="Minimum reliability"
+                        )
+                    with gr.Column(min_width=280):
+                        cost = gr.Number(
+                            value=0.01,
+                            minimum=0,
+                            step=0.00000001,
+                            precision=8,
+                            label="Maximum estimated cost (USD/request)",
+                        )
+                        latency = gr.Slider(
+                            0, 180000, value=30000, step=1, label="Maximum median latency (ms)"
+                        )
+                gr.Markdown(
+                    "Quality and latency are estimates. The default quality threshold is 0.50. "
+                    "Stricter requirements may leave no eligible model.",
+                    elem_classes="finops-note",
+                )
+            with gr.Row():
+                route_token_limit = gr.Slider(
+                    64, 2048, step=64, value=1024, label="Maximum output tokens"
+                )
+                execute = gr.Checkbox(
+                    value=False, label="Execute selected model (uses provider quota)"
+                )
             route_button = gr.Button("Route request", variant="primary")
-            selected_badge = gr.Markdown()
+            selected_badge = gr.Markdown(elem_classes="decision-panel")
+            gr.Markdown("### Candidate evaluation", elem_classes="finops-section")
+            gr.Markdown(
+                "Expected cost informs ranking. Budget cost reserves the maximum output tokens. "
+                "Scroll horizontally to inspect all evidence and rejection reasons.",
+                elem_classes="finops-note",
+            )
             explanations = gr.Dataframe(
                 headers=[
                     "Model",
                     "Constraints",
                     "Quality estimate",
                     "Expected cost USD",
-                    "Cost at output budget USD",
-                    "Latency estimate ms",
+                    "Budget cost USD",
+                    "Latency ms",
                     "Reliability",
-                    "Evidence samples",
+                    "Samples",
                     "Matched tasks",
                     "Quality basis",
                     "Rank",
                     "Score",
-                    "Reasons",
+                    "Rejection reasons",
                 ],
                 interactive=False,
+                wrap=True,
+                max_height=650,
+                column_widths=[200, 100, 110, 130, 130, 110, 100, 90, 150, 230, 65, 85, 400],
+                elem_classes="results-table",
             )
-            live_response = gr.Textbox(label="Live response", lines=8)
+            with gr.Accordion("Profile coverage and evidence", open=False):
+                task_hint = gr.Markdown(value=read_profile_view("auto")[1])
+            route_task.change(task_profile_hint, inputs=route_task, outputs=task_hint)
+            gr.Markdown("### Generated response", elem_classes="finops-section")
+            live_response = gr.Markdown(
+                label="Live response", sanitize_html=True, elem_classes="response-panel"
+            )
             route_button.click(
                 smart_route,
                 [
@@ -419,11 +491,16 @@ def build_demo(
                 ],
                 [selected_badge, explanations, live_response],
             )
+
         with gr.Tab("Model Profiles"):
             gr.Markdown(
-                "Profiles use deterministic reference scoring. "
-                "Evaluate saved benchmark runs to populate this view."
+                "### Measured model profiles\n"
+                "Inspect reference scores, response times, and reliability from saved benchmarks."
             )
+            with gr.Row():
+                refresh = gr.Button("Refresh profiles")
+                evaluate_button = gr.Button("Evaluate saved benchmarks", variant="primary")
+            profile_status = gr.Markdown(value=read_profile_view()[1])
             profile_table = gr.Dataframe(
                 headers=[
                     "Model",
@@ -437,15 +514,16 @@ def build_demo(
                 ],
                 value=read_profile_view()[0],
                 interactive=False,
+                wrap=True,
+                max_height=750,
+                column_widths=["22%", "14%", "9%", "11%", "11%", "13%", "11%", "9%"],
+                elem_classes="results-table",
             )
-            profile_status = gr.Markdown(value=read_profile_view()[1])
-            refresh = gr.Button("Refresh profiles")
             refresh.click(
                 refresh_profiles,
                 inputs=route_task,
                 outputs=[profile_table, profile_status, task_hint],
             )
-            evaluate_button = gr.Button("Evaluate saved benchmarks")
             evaluate_button.click(
                 evaluate_saved,
                 inputs=route_task,
@@ -457,4 +535,4 @@ def build_demo(
 
 if __name__ == "__main__":
     demo = build_demo()
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860, **LAUNCH_OPTIONS)

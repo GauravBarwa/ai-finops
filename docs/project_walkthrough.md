@@ -77,6 +77,11 @@ Gradio calls the Python services directly. Running the API and UI with the same
 configuration gives both access to the same files. This keeps the demonstration
 simple while preserving the service boundary used by API clients.
 
+`app/ui.py` defines the shared light/dark palette, typography, table styles, and
+Gradio launch presentation options. Answers render as sanitized Markdown with
+a bounded typing reveal after a provider returns its complete response. The reveal
+changes presentation timing while recorded latency remains the provider-call metric.
+
 ### Pydantic schemas
 
 `app/schemas` defines comparison requests/results, public model metadata, telemetry,

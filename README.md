@@ -15,6 +15,8 @@ an example routing decision, start with the project walkthrough.
 
 - A common interface for native Ollama and LiteLLM providers.
 - Concurrent model comparison with incremental Gradio results and execution telemetry.
+- A responsive Gradio layout with wrapped result tables, rendered Markdown answers,
+  and a typing reveal after each provider response completes.
 - Six configured active models across Ollama, Gemini, and Groq.
 - Sixteen reference-answer tasks covering summarization, classification, extraction,
   and reasoning.
@@ -194,6 +196,7 @@ GRADIO_ANALYTICS_ENABLED=False pytest -q
 ruff check .
 ```
 
+The UI refresh recorded 171 passing tests and retained all 31 Gradio HTTP workflows.
 The 6 November 2026 bug audit recorded 169 passing tests and 31 Gradio HTTP workflow
 checks, plus browser checks across all three tabs and a live local Ollama call.
 Earlier checks recorded 37 broader workflows and 23 focused prompt-routing workflows.

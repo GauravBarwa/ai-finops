@@ -10,7 +10,7 @@ The regression suite covers provider normalization, schemas, comparison, cost, p
 publication, constraints, prompt-aware estimates, routing fallback, API contracts,
 and the actual Gradio callback functions.
 
-The Dockerfile's package metadata copy now includes README and LICENSE. Docker runtime
+The Dockerfile's package metadata copy includes the README. Docker runtime
 validation remains open because the publication environment lacks a Docker executable.
 Container setup commands are documented for an environment with Docker available.
 [Configuration](configuration.md)
@@ -71,6 +71,19 @@ HTTP workflows and component wiring. Screenshot/layout inspection remains an add
 manual check for the presentation environment.
 
 ## Regression coverage
+
+The subsequent UI refresh recorded **171 passing tests** and **31 Gradio HTTP workflow
+checks**. Answer components render sanitized Markdown, retain complete final content,
+and reveal successful responses in bounded incremental frames. Provider errors remain
+literal fenced text, including embedded Markdown fences and diagnostics longer than
+180 characters. Table cells wrap and profile metrics use consistent display precision.
+The typing reveal begins after a provider response completes. Its animation time is
+separate from the recorded provider latency.
+
+Browser checks used simulated Markdown answers and long quota errors. They inspected
+all three tabs, light/dark colors, a narrow viewport, profile formatting, and page/table
+overflow. The refreshed UI targets Gradio 6.28 within major version 6, matching the
+verification environment.
 
 The follow-up bug audit on 6 November 2026 recorded **169 passing tests** and
 **31 Gradio HTTP workflow checks** across all three tabs. Ruff and diff whitespace

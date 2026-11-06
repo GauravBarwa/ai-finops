@@ -72,5 +72,4 @@ reports. Keep GitHub links within that committed documentation. Raw verification
 benchmark JSONL, and profiles live under `data/results` and are generated per environment.
 Refer to those local artifacts with paths and reproduction commands.
 
-The project declares the MIT license in its package metadata and repository license.
-[License](LICENSE)
+The package metadata in `pyproject.toml` records the project's current license declaration.

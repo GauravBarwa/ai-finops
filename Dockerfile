@@ -8,7 +8,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml README.md LICENSE ./
+COPY pyproject.toml README.md ./
 COPY app/ app/
 COPY data/ data/
 COPY scripts/ scripts/

@@ -182,7 +182,7 @@ def test_multiline_errors_cannot_break_results_table():
     assert "1 pending" in summary
     assert len(rows) == 1 and len(rows[0]) == 6
     assert "\n" not in rows[0][-1]
-    assert error in details  # full literal text goes to a Textbox, not Markdown
+    assert error in details  # full diagnostics remain literal inside a Markdown code fence
 
 
 def test_gradio_binds_async_generator_to_comparison():
@@ -192,7 +192,8 @@ def test_gradio_binds_async_generator_to_comparison():
 
     assert inspect.isasyncgenfunction(fn.fn)
     assert len(fn.outputs) == 3
-    assert fn.outputs[-1].get_config()["type"] == "text"
+    assert fn.outputs[-1].get_block_name() == "markdown"
+    assert fn.outputs[-1].get_config()["sanitize_html"] is True
 
 
 def test_replacement_registry_and_retired_reason():

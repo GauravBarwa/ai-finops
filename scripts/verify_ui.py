@@ -16,6 +16,7 @@ from gradio_client import Client
 
 from app.core.config import get_settings
 from app.demo import build_demo
+from app.ui import LAUNCH_OPTIONS
 
 USER_PROMPT = (
     "Summarize in 2 lines: An LLM (Large Language Model) Engineer is a specialized "
@@ -43,7 +44,8 @@ def verify(args):
     output.parent.mkdir(parents=True, exist_ok=True)
     try:
         demo.launch(
-            server_name="127.0.0.1", server_port=args.port, prevent_thread_lock=True, quiet=True
+            server_name="127.0.0.1", server_port=args.port, prevent_thread_lock=True, quiet=True,
+            **LAUNCH_OPTIONS,
         )
         client = Client(f"http://127.0.0.1:{args.port}/", verbose=False)
 
