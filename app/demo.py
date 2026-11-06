@@ -19,6 +19,7 @@ import gradio as gr
 
 from app.core.exceptions import BenchmarkError
 from app.core.logging import setup_logging
+from app.demo_presets import COMPARISON_PRESETS, ROUTING_PRESETS
 from app.llm.interface import LLMClient
 from app.llm.provider_client import ProviderRouterClient
 from app.llm.registry import ModelRegistry
@@ -262,6 +263,43 @@ def build_demo(
     enabled_models = registry.list_enabled()
     model_choices = [(m.display_name, m.model_id) for m in enabled_models]
 
+    def load_comparison_preset(name):
+        if name is None:
+            return (gr.skip(),) * 8
+        description, request = COMPARISON_PRESETS[name]
+        return (
+            request.prompt,
+            request.task_type,
+            request.models or [],
+            request.max_tokens,
+            description,
+            "",
+            [],
+            "",
+        )
+
+    def load_route_preset(name):
+        if name is None:
+            return (gr.skip(),) * 14
+        description, request = ROUTING_PRESETS[name]
+        limits = request.constraints
+        return (
+            request.prompt,
+            request.task_type,
+            request.policy,
+            limits.min_quality,
+            limits.max_cost,
+            limits.max_latency_ms,
+            limits.min_reliability,
+            request.execute,
+            request.max_tokens,
+            request.routing_mode,
+            description,
+            "",
+            [],
+            "",
+        )
+
     async def _compare(prompt, task_type, selected_models, max_tokens):
         if not isinstance(prompt, str) or not prompt.strip():
             yield "Please enter a prompt.", [], ""
@@ -298,6 +336,17 @@ def build_demo(
         with gr.Tab("Comparison"):
             gr.Markdown(
                 "### Compare model performance\nRun one prompt across your selected models."
+            )
+            comparison_preset = gr.Dropdown(
+                choices=list(COMPARISON_PRESETS),
+                value=None,
+                label="Comparison preset",
+                info="Choose a sample, review the settings, then click Compare models.",
+            )
+            comparison_purpose = gr.Markdown(
+                "Presets cover summaries, sentiment, JSON extraction, reasoning, and Markdown. "
+                "They select all enabled models and fill the output-token limit.",
+                elem_classes="finops-note",
             )
             with gr.Row(equal_height=True):
                 with gr.Column(scale=3, min_width=320, elem_classes="finops-panel"):
@@ -349,39 +398,44 @@ def build_demo(
                 sanitize_html=True,
                 elem_classes="response-panel",
             )
-            compare_btn.click(
+            compare_event = compare_btn.click(
                 fn=_compare,
                 inputs=[prompt_input, task_type_input, model_selector, token_limit],
                 outputs=[summary_output, comparison_table, detail_output],
             )
-            with gr.Accordion("Sample prompts", open=False):
-                gr.Examples(
-                    examples=[
-                        [
-                            "Summarize in 2 sentences: Cloud computing allows businesses to rent "
-                            "computing resources on demand instead of maintaining expensive "
-                            "servers. This pay-as-you-go model has enabled startups to launch "
-                            "products without "
-                            "massive capital investment.",
-                            "summarization",
-                            [],
-                            1024,
-                        ],
-                        [
-                            "Classify the sentiment as POSITIVE, NEGATIVE, or NEUTRAL:\n\n"
-                            '"Great product, fast shipping, exactly as described!"',
-                            "classification",
-                            [],
-                            1024,
-                        ],
-                    ],
-                    inputs=[prompt_input, task_type_input, model_selector, token_limit],
-                )
+            comparison_preset.change(
+                load_comparison_preset,
+                comparison_preset,
+                [
+                    prompt_input,
+                    task_type_input,
+                    model_selector,
+                    token_limit,
+                    comparison_purpose,
+                    summary_output,
+                    comparison_table,
+                    detail_output,
+                ],
+                cancels=[compare_event],
+            )
 
         with gr.Tab("Smart Router"):
             gr.Markdown(
                 "### Route a request\n"
                 "Choose a model using your prompt, saved evidence, and requirements."
+            )
+            routing_preset = gr.Dropdown(
+                choices=list(ROUTING_PRESETS),
+                value=None,
+                label="Routing preset",
+                info="Load a complete demonstration setup, then click Route request.",
+            )
+            routing_purpose = gr.Markdown(
+                "Replay the same summary topics in prompt-aware and historical modes. "
+                "Other presets demonstrate task detection, policies, budgets, and missing topic "
+                "evidence. Saved measurements determine the winning model. "
+                "Every routing preset starts with execution off.",
+                elem_classes="finops-note",
             )
             route_prompt = gr.Textbox(
                 label="Prompt",
@@ -475,21 +529,28 @@ def build_demo(
             live_response = gr.Markdown(
                 label="Live response", sanitize_html=True, elem_classes="response-panel"
             )
-            route_button.click(
+            routing_inputs = [
+                route_prompt,
+                route_task,
+                route_policy,
+                quality,
+                cost,
+                latency,
+                reliability,
+                execute,
+                route_token_limit,
+                routing_basis,
+            ]
+            route_event = route_button.click(
                 smart_route,
-                [
-                    route_prompt,
-                    route_task,
-                    route_policy,
-                    quality,
-                    cost,
-                    latency,
-                    reliability,
-                    execute,
-                    route_token_limit,
-                    routing_basis,
-                ],
+                routing_inputs,
                 [selected_badge, explanations, live_response],
+            )
+            routing_preset.change(
+                load_route_preset,
+                routing_preset,
+                [*routing_inputs, routing_purpose, selected_badge, explanations, live_response],
+                cancels=[route_event],
             )
 
         with gr.Tab("Model Profiles"):

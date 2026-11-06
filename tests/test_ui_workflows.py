@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.demo import build_demo
+from app.demo_presets import COMPARISON_PRESETS, ROUTING_PRESETS
 from app.llm.interface import LLMResponse
 from app.llm.registry import ModelInfo, ModelRegistry
 from app.schemas.profile import ModelProfile, ProfilesResponse
@@ -301,14 +302,34 @@ async def test_comparison_errors_selected_models_and_repeat(ui):
     assert "Invalid request" in outputs[-1][0] and outputs[-1][1] == []
 
 
-def test_ui_defaults_and_complete_examples(ui):
-    demo, _, _, _, _ = ui
+def test_ui_defaults_and_complete_presets(ui):
+    demo, functions, _, client, _ = ui
     config = demo.config
     quality = next(c for c in config["components"] if c["props"].get("label") == "Minimum quality")
     assert quality["props"]["value"] == 0.5
-    examples = next(c for c in config["components"] if c["type"] == "dataset")
-    assert all(len(sample) == 4 and sample[-1] == 1024 for sample in examples["props"]["samples"])
+    for name, (description, request) in COMPARISON_PRESETS.items():
+        loaded = functions["load_comparison_preset"](name)
+        assert loaded[:4] == (
+            request.prompt, request.task_type, request.models or [], request.max_tokens
+        )
+        assert loaded[4:] == (description, "", [], "")
+    for name, (description, request) in ROUTING_PRESETS.items():
+        loaded = functions["load_route_preset"](name)
+        assert loaded[:10] == (
+            request.prompt, request.task_type, request.policy, request.constraints.min_quality,
+            request.constraints.max_cost, request.constraints.max_latency_ms,
+            request.constraints.min_reliability, False, request.max_tokens, request.routing_mode,
+        )
+        assert loaded[10:] == (description, "", [], "")
+    client.generate.assert_not_called()
     assert len([c for c in config["components"] if c["type"] == "tabitem"]) == 3
+
+
+@pytest.mark.parametrize("callback", ["load_comparison_preset", "load_route_preset"])
+def test_clearing_preset_preserves_edited_controls(ui, callback):
+    _, functions, _, client, _ = ui
+    assert all(value == {"__type__": "update"} for value in functions[callback](None))
+    client.generate.assert_not_called()
 
 
 @pytest.mark.parametrize("budget", [0, 0.00000001, 0.0001, 0.005, 0.01, 1.25])
@@ -322,7 +343,9 @@ def test_cost_field_preserves_fractional_dollar_budgets(ui, budget):
     assert cost["props"]["step"] == 0.00000001
     assert cost["props"]["precision"] == 8
     assert demo.blocks[cost["id"]].preprocess(budget) == budget
-    assert all(cost["id"] not in event["outputs"] for event in demo.config["dependencies"])
+    writers = [event for event in demo.config["dependencies"] if cost["id"] in event["outputs"]]
+    assert len(writers) == 1
+    assert demo.fns[writers[0]["id"]].fn.__name__ == "load_route_preset"
 
 
 @pytest.mark.asyncio

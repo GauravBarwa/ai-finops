@@ -72,6 +72,20 @@ manual check for the presentation environment.
 
 ## Regression coverage
 
+The preset expansion recorded **173 passing tests** and **84 Gradio HTTP workflow
+checks**. The checks load all 11 comparison presets and all 22 routing presets,
+validate every populated setting, clear earlier outputs, and submit every routing
+setup. Routing preset selection resets execution to off. Clearing a selector preserves
+edited controls. Switching a preset cancels the corresponding in-progress UI generation.
+
+An additional recommendation-only replay against the local measured profiles confirmed
+three distinct selections across the four prompt-aware summaries, a shared selection
+for their historical equivalents, policy-driven selection changes, strict zero-cost
+rejection, and rejection when increasing the reserved output budget under a fixed cost
+limit. These are replays of known benchmark inputs and depend on the active profiles.
+The demo guide records the checked selections and suggested presentation order.
+[Preset demonstration sequence](demo_guide.md#preset-demonstration-sequence)
+
 The subsequent UI refresh recorded **171 passing tests** and **31 Gradio HTTP workflow
 checks**. Answer components render sanitized Markdown, retain complete final content,
 and reveal successful responses in bounded incremental frames. Provider errors remain

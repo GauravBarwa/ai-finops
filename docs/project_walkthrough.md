@@ -82,6 +82,12 @@ Gradio launch presentation options. Answers render as sanitized Markdown with
 a bounded typing reveal after a provider returns its complete response. The reveal
 changes presentation timing while recorded latency remains the provider-call metric.
 
+`app/demo_presets.py` contains validated sample requests and explanations. The UI
+provides 11 comparison presets and 22 routing setups. Four summary topics can be
+replayed with identical settings in both routing modes, alongside policy, task,
+budget, and evidence-fallback cases. Routing presets reset execution to off and
+selection clears prior results before the user submits the new request.
+
 ### Pydantic schemas
 
 `app/schemas` defines comparison requests/results, public model metadata, telemetry,

@@ -17,6 +17,8 @@ an example routing decision, start with the project walkthrough.
 - Concurrent model comparison with incremental Gradio results and execution telemetry.
 - A responsive Gradio layout with wrapped result tables, rendered Markdown answers,
   and a typing reveal after each provider response completes.
+- Eleven comparison presets and 22 routing presets covering task types, both routing
+  bases, policy tradeoffs, output budgets, evidence fallback, and strict constraints.
 - Six configured active models across Ollama, Gemini, and Groq.
 - Sixteen reference-answer tasks covering summarization, classification, extraction,
   and reasoning.
@@ -196,6 +198,8 @@ GRADIO_ANALYTICS_ENABLED=False pytest -q
 ruff check .
 ```
 
+The preset expansion recorded 173 passing tests and 84 Gradio HTTP workflow checks,
+including every preset loader and every routing preset.
 The UI refresh recorded 171 passing tests and retained all 31 Gradio HTTP workflows.
 The 6 November 2026 bug audit recorded 169 passing tests and 31 Gradio HTTP workflow
 checks, plus browser checks across all three tabs and a live local Ollama call.

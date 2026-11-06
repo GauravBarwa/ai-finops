@@ -16,6 +16,7 @@ from gradio_client import Client
 
 from app.core.config import get_settings
 from app.demo import build_demo
+from app.demo_presets import COMPARISON_PRESETS, ROUTING_PRESETS
 from app.ui import LAUNCH_OPTIONS
 
 USER_PROMPT = (
@@ -75,6 +76,37 @@ def verify(args):
                 "/task_profile_hint",
                 [task],
                 lambda r: require("Best measured quality" in r, "Missing task profiles"),
+            )
+        for name, (description, request) in COMPARISON_PRESETS.items():
+            check(
+                "comparison_preset_" + name, "/load_comparison_preset", [name],
+                lambda r, request=request, description=description: require(
+                    r[:4] == (request.prompt, request.task_type, [], request.max_tokens)
+                    and r[4] == description and not r[6]["data"],
+                    "Comparison preset did not populate every control or clear previous results",
+                ),
+            )
+        for name, (description, request) in ROUTING_PRESETS.items():
+            loaded = check(
+                "routing_preset_" + name, "/load_route_preset", [name],
+                lambda r, request=request, description=description: require(
+                    r[0] == request.prompt and r[1] == request.task_type
+                    and r[2] == request.policy and r[3] == request.constraints.min_quality
+                    and r[4] == request.constraints.max_cost
+                    and r[5] == request.constraints.max_latency_ms
+                    and r[6] == request.constraints.min_reliability and r[7] is False
+                    and r[8] == request.max_tokens and r[9] == request.routing_mode
+                    and r[10] == description and not r[12]["data"],
+                    "Routing preset did not populate every control or clear previous results",
+                ),
+            )
+            check(
+                "route_loaded_preset_" + name, "/smart_route", list(loaded[:10]),
+                lambda r: require(
+                    ("**Status:** recommended" in r[0] or "**Status:** no_candidate" in r[0])
+                    and len(r[1]["data"]) == 9,
+                    "Loaded preset did not complete through the routing workflow",
+                ),
             )
         refreshed = check(
             "profiles_refresh_before",
@@ -149,19 +181,6 @@ def verify(args):
                 "Missing comparison input validation",
             ),
         )
-        # Exercises example selection, including the token limit that was missing previously.
-        if any(fn.fn and fn.fn.__name__ == "load_example" for fn in demo.fns.values()):
-            for index in range(2):
-                check(
-                    f"comparison_example_{index}",
-                    "/load_example",
-                    [index],
-                    lambda r: require(
-                        len(r) == 4
-                        and (r[-1].get("value") if isinstance(r[-1], dict) else r[-1]) == 1024,
-                        "Example failed to populate all controls",
-                    ),
-                )
         if args.live:
             check(
                 "compare_all_live",

@@ -68,6 +68,50 @@ New prompt -> analysis -> hard requirements -> ranking -> optional execution
 6. Rehearse a live response and the strict-constraint cases below. Disclose any local
    warm-up because cold-start latency can differ from later calls.
 
+## Preset demonstration sequence
+
+The Comparison preset selector provides 11 examples covering summaries, all three
+sentiment labels, JSON extraction, arithmetic, token accounting, and Markdown output.
+Selecting a preset fills the prompt, task, model selection, and output-token limit.
+Review the model selection before clicking Compare models.
+
+The Routing preset selector provides 22 complete setups for prompt-aware and historical
+routing. Selection fills the prompt, task detection, policy, requirements, output budget,
+and routing basis. It resets execution to off and clears the prior result. Switching
+presets also cancels an in-progress UI generation. Click Route request after loading.
+
+For the clearest demonstration of content-dependent selection, use these four presets
+in order, keeping their loaded quality-first policy and requirements.
+
+1. Prompt-aware / AI summary
+2. Prompt-aware / Cloud summary
+3. Prompt-aware / Quantum summary
+4. Prompt-aware / Short server-cost summary
+
+With the local profiles checked on 6 November 2026, those requests selected Gemini
+3.5 Flash-Lite, Gemini 3.6 Flash, Gemini 3.6 Flash, and local Llama 3.2 respectively.
+Next choose the corresponding four Historical presets. That experiment selected Groq
+GPT-OSS 20B for all four historical summaries. These inputs replay known benchmark
+passages so their evidence can be inspected. Winners depend on the saved measurements
+and can change after re-evaluation or in another environment.
+
+Then demonstrate the remaining behavior with the following pairs.
+
+- Cloud summary and Cloud cost first isolate a policy change for the same text.
+- Short server-cost summary and Short summary latency first emphasize the speed tradeoff.
+- Historical Classification quality first and Classification cost first show historical
+  policy selection for the same sentiment request.
+- Cloud with a 64-token budget and Cloud with a 2048-token budget keep the $0.0005 cost
+  limit fixed. In the checked experiment, the smaller budget selected Gemini 3.6 Flash,
+  while the larger budget returned `no_candidate` with rejection reasons.
+- Unfamiliar topic demonstrates the visible task-prior fallback.
+- Zero cost limit demonstrates strict cost filtering in either routing mode.
+
+Classification, extraction, and reasoning presets in both modes complete the task-type
+walkthrough. Enable execution explicitly for a selected live demonstration after reviewing
+the loaded settings. A fresh clone needs benchmark collection and evaluated profiles
+before these recommendation examples have measured candidates.
+
 ## A 12–15 minute walkthrough
 
 ### Minutes 0–2 — Problem and architecture
