@@ -112,6 +112,7 @@ def test_ties_and_custom_weights():
         {"constraints": {"max_cost": -1}},
         {"constraints": {"max_latency_ms": float("inf")}},
         {"weights": dict(quality=0, cost=0, latency=0, reliability=0)},
+        {"weights": dict(quality=1e308, cost=1e308)},
         {"policy": "invalid"},
         {"prompt": "   "},
         {"task_type": "unknown"},

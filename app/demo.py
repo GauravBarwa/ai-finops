@@ -363,8 +363,16 @@ def build_demo(
             )
             task_hint = gr.Markdown(value=read_profile_view("auto")[1])
             route_task.change(task_profile_hint, inputs=route_task, outputs=task_hint)
-            cost = gr.Number(value=0.01, minimum=0, label="Maximum estimated cost (USD/request)")
-            latency = gr.Slider(0, 180000, value=30000, label="Maximum median latency (ms)")
+            cost = gr.Number(
+                value=0.01,
+                minimum=0,
+                step=0.00000001,
+                precision=8,
+                label="Maximum estimated cost (USD/request)",
+            )
+            latency = gr.Slider(
+                0, 180000, value=30000, step=1, label="Maximum median latency (ms)"
+            )
             reliability = gr.Slider(0, 1, value=0.8, step=0.01, label="Minimum reliability")
             execute = gr.Checkbox(value=False, label="Execute selected model (uses provider quota)")
             route_token_limit = gr.Slider(

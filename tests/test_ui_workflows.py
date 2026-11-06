@@ -268,6 +268,34 @@ def test_ui_defaults_and_complete_examples(ui):
     assert len([c for c in config["components"] if c["type"] == "tabitem"]) == 3
 
 
+@pytest.mark.parametrize("budget", [0, 0.00000001, 0.0001, 0.005, 0.01, 1.25])
+def test_cost_field_preserves_fractional_dollar_budgets(ui, budget):
+    demo, _, _, _, _ = ui
+    cost = next(
+        component
+        for component in demo.config["components"]
+        if component["props"].get("label") == "Maximum estimated cost (USD/request)"
+    )
+    assert cost["props"]["step"] == 0.00000001
+    assert cost["props"]["precision"] == 8
+    assert demo.blocks[cost["id"]].preprocess(budget) == budget
+    assert all(cost["id"] not in event["outputs"] for event in demo.config["dependencies"])
+
+
+@pytest.mark.asyncio
+async def test_custom_cost_limit_applies_after_prompt_edits(ui):
+    _, functions, _, client, _ = ui
+    for prompt in ["Summarize cloud computing.", "Summarize the benefits of cloud computing."]:
+        for budget, expected_status in [(0.005, "recommended"), (0.00000001, "no_candidate")]:
+            badge, rows, _ = await functions["smart_route"](
+                prompt, "summarization", "balanced", 0.5, budget, 30000, 0.8, False
+            )
+            assert f"**Status:** {expected_status}" in badge
+            if expected_status == "no_candidate":
+                assert all("max_cost" in row[-1] for row in rows)
+    client.generate.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_missing_golden_dataset_has_actionable_profile_error(ui):
     _, f, evaluation, _, _ = ui
@@ -276,3 +304,34 @@ async def test_missing_golden_dataset_has_actionable_profile_error(ui):
     rows, status, _ = await f["evaluate_saved"]("summarization")
     assert rows and "Benchmark tasks file not found" in status
     assert evaluation.profiles_path.read_bytes() == original
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "{}",
+        "[null]",
+        "[]",
+        '[{"task_id":"missing_fields"}]',
+        '[{"task_id":"a","task_type":"unknown","prompt":"Hello"}]',
+        '[{"task_id":"a","task_type":"summarization","prompt":"  "}]',
+        json.dumps([
+            dict(task_id="a", task_type="summarization", prompt="Summarize", reference="A")
+        ] * 2),
+    ],
+)
+async def test_malformed_dataset_preserves_profiles_and_allows_routing(ui, raw):
+    _, functions, evaluation, client, _ = ui
+    original = evaluation.profiles_path.read_bytes()
+    evaluation.tasks_path.write_text(raw)
+    rows, status, _ = await functions["evaluate_saved"]("summarization")
+    assert rows and "Evaluation could not complete" in status
+    assert evaluation.profiles_path.read_bytes() == original
+    badge, candidates, live = await functions["smart_route"](
+        "Summarize cloud computing.", "auto", "balanced", 0.5, 0.005, 30000, 0.8, False
+    )
+    assert "**Status:** recommended" in badge
+    assert "Detailed benchmark evidence is unavailable" in badge
+    assert len(candidates) == 2 and "Recommendation only" in live
+    client.generate.assert_not_called()

@@ -108,6 +108,24 @@ async def test_api_evaluate_profiles_route(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_benchmark_does_not_call_disabled_model():
+    models = registry()
+    models.get("cheap").enabled = False
+    models.get("cheap").disabled_reason = "Unavailable for this deployment"
+    tasks, _ = dataset()
+    adapter = AsyncMock()
+    adapter.generate.return_value = LLMResponse(content="YES")
+    records = await BenchmarkService(adapter, models).run_benchmark(
+        ["cheap", "baseline"], tasks[:1]
+    )
+    assert len(records) == 2
+    assert not records[0].success and "Unavailable for this deployment" in records[0].error
+    assert records[1].success
+    adapter.generate.assert_awaited_once()
+    assert adapter.generate.call_args.kwargs["model"] == "test/baseline"
+
+
+@pytest.mark.asyncio
 async def test_benchmark_continues_after_adapter_exception(tmp_path):
     tasks, _ = dataset()
     adapter = AsyncMock()

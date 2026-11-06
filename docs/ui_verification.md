@@ -55,6 +55,22 @@ manual check for the presentation environment.
 
 ## Regression coverage
 
+The follow-up bug audit on 6 November 2026 recorded **169 passing tests** and
+**31 Gradio HTTP workflow checks** across all three tabs. Ruff and diff whitespace
+checks passed. The fixes cover fractional-dollar budget input, millisecond latency
+steps, whitespace-only comparison API prompts, blank Ollama answers, malformed or
+duplicate benchmark tasks, disabled benchmark models, and overflowing custom weights.
+Failed dataset evaluation retains the last valid profiles, which remain available
+for routing with an explicit evidence warning.
+
+Browser checks verified a $0.005 budget and a 502 ms latency limit after prompt edits,
+tab switches, profile refresh, and repeated routing. Comparison checks used simulated
+provider responses to exercise partial failure and multiline error display. A separate
+live call to the configured local Llama 3.2 model returned a nonempty answer with
+consistent token totals. Blank-answer handling uses simulated responses for regression
+coverage. The original reported budget reset did not reproduce in the test browser,
+but the cost field now has explicit eight-decimal precision and a fractional step.
+
 The suite exercises the following failure and recovery paths.
 
 - Adapter errors, provider prefixes, missing keys, retired providers, empty cloud

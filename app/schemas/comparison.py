@@ -27,7 +27,9 @@ class CompareRequest(BaseModel):
         Sampling temperature for all model calls.
     """
 
-    prompt: str = Field(..., min_length=1, description="The prompt to compare across models")
+    prompt: str = Field(
+        ..., min_length=1, pattern=r"\S", description="The prompt to compare across models"
+    )
     task_type: Optional[str] = Field(
         default=None,
         description="Optional workload type (summarization, classification, extraction)",

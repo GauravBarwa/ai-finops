@@ -76,6 +76,21 @@ async def test_ollama_adapter_returns_failure_telemetry(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("content", [None, "", " \n\t"])
+async def test_ollama_empty_answer_is_failure_with_usage(monkeypatch, content):
+    fake_client = FakeAsyncClient(FakeResponse({
+        "message": {"content": content},
+        "prompt_eval_count": 12,
+        "eval_count": 7,
+    }))
+    monkeypatch.setattr(ollama_module.httpx, "AsyncClient", lambda **kwargs: fake_client)
+    response = await OllamaClient().generate("Say hello", "ollama/llama3.2")
+    assert not response.success
+    assert "no answer text" in response.error
+    assert (response.input_tokens, response.output_tokens, response.total_tokens) == (12, 7, 19)
+
+
+@pytest.mark.asyncio
 async def test_provider_router_uses_ollama_for_ollama_models():
     ollama = AsyncMock()
     litellm = AsyncMock()

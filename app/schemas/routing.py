@@ -1,5 +1,6 @@
 """Validated routing policy, constraints, candidate explanations and execution results."""
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -40,8 +41,9 @@ class Weights(BaseModel):
 
     @model_validator(mode="after")
     def positive_total(self):
-        if sum(self.model_dump().values()) <= 0:
-            raise ValueError("At least one weight must be positive")
+        total = sum(self.model_dump().values())
+        if not math.isfinite(total) or total <= 0:
+            raise ValueError("Weights must have a finite positive total")
         return self
 
 

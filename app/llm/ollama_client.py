@@ -94,7 +94,13 @@ class OllamaClient(LLMClient):
                 latency_ms=round(elapsed_ms, 2),
                 model=model_name,
                 provider="ollama",
-                success=True,
+                success=bool(content.strip()),
+                error=(
+                    None
+                    if content.strip()
+                    else "Model returned no answer text; "
+                    "increase max_tokens or reduce reasoning effort"
+                ),
                 raw_response=data,
             )
 

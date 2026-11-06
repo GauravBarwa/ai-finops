@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
+
+from pydantic import Field, TypeAdapter
 
 from app.core.config import get_settings
 from app.core.exceptions import BenchmarkError
@@ -14,26 +16,21 @@ from app.core.logging import get_logger
 from app.llm.cost import calculate_cost
 from app.llm.interface import LLMClient, LLMResponse
 from app.llm.registry import ModelRegistry
+from app.schemas.profile import TaskType
 from app.schemas.telemetry import TelemetryRecord
 from app.services.statistics import latency_summary
 
 logger = get_logger("benchmark_service")
 
 
+@dataclass
 class BenchmarkTask:
     """A single benchmark task loaded from the dataset."""
 
-    def __init__(
-        self,
-        task_id: str,
-        task_type: str,
-        prompt: str,
-        reference: Optional[str] = None,
-    ) -> None:
-        self.task_id = task_id
-        self.task_type = task_type
-        self.prompt = prompt
-        self.reference = reference
+    task_id: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    task_type: TaskType
+    prompt: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    reference: Optional[str] = None
 
 
 class BenchmarkService:
@@ -67,18 +64,14 @@ class BenchmarkService:
         if not path.exists():
             raise BenchmarkError(f"Benchmark tasks file not found: {path}")
 
-        with open(path, "r") as f:
-            raw = json.load(f)
-
-        tasks = [
-            BenchmarkTask(
-                task_id=entry["task_id"],
-                task_type=entry["task_type"],
-                prompt=entry["prompt"],
-                reference=entry.get("reference"),
-            )
-            for entry in raw
-        ]
+        try:
+            tasks = TypeAdapter(list[BenchmarkTask]).validate_json(path.read_text())
+        except ValueError as exc:
+            raise BenchmarkError(f"Invalid benchmark tasks file: {exc}") from exc
+        if not tasks:
+            raise BenchmarkError("Benchmark tasks file must contain at least one task")
+        if len({task.task_id for task in tasks}) != len(tasks):
+            raise BenchmarkError("Benchmark task IDs must be unique")
 
         logger.info("Loaded %d benchmark tasks from %s", len(tasks), path)
         return tasks
@@ -131,6 +124,10 @@ class BenchmarkService:
 
                 started = time.perf_counter()
                 try:
+                    if not model_info.enabled:
+                        raise ValueError(
+                            model_info.disabled_reason or "Model is disabled in the registry"
+                        )
                     llm_response = await self._client.generate(
                         prompt=task.prompt,
                         model=model_info.litellm_model_name,

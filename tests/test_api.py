@@ -71,6 +71,11 @@ class TestModelsEndpoint:
 
 
 class TestCompareEndpoint:
+    @pytest.mark.parametrize("prompt", [" ", "\n\t", "\u2003"])
+    async def test_compare_whitespace_prompt_rejected(self, client, prompt):
+        resp = await client.post("/compare", json={"prompt": prompt})
+        assert resp.status_code == 422
+
     async def test_compare_validation_error(self, client):
         """Empty prompt should be rejected."""
         resp = await client.post("/compare", json={"prompt": ""})
